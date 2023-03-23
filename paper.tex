@@ -1,0 +1,114 @@
+\documentclass[a4paper, 12pt]{scrarticle}
+
+\usepackage{outlines}
+\usepackage[spanish]{babel}
+\usepackage{xcolor}
+\usepackage[fixlanguage]{babelbib}
+    \bibliographystyle{babunsrt}
+
+\usepackage{graphicx}
+\graphicspath{ {./img/} }
+
+\usepackage[
+	top=2.5cm,
+	bottom=2.5cm,
+	left=2cm,
+	right=2cm,
+	footskip=1cm,
+	headsep=0.75cm,
+]{geometry}
+
+\usepackage{hyperref}
+\usepackage{dblfloatfix}
+\usepackage{lipsum}
+
+\title{Reconocimiento de frutas por imágenes}
+\author{
+\small
+    \begin{tabular}{r l}
+         Yago Fernández Rego & \texttt{yago.fernandez.rego} \\
+         Guillermo Fernández Sánchez &  \texttt{guillermo.fernandezs} \\
+         Rodrigo Naranjo González & \texttt{r.naranjo} \\
+         Adrián Rodríguez López & \texttt{adrian.rodriguez.lopez} 
+    \end{tabular}
+}
+\subtitle{Aprendizaje Automático}
+
+
+\begin{document}
+\maketitle
+\newpage
+\tableofcontents
+\newpage
+    
+\section{Introducción}
+    Las frutas son una maravilla de la naturaleza que nos han acompañado desde tiempos inmemoriales. Además de ser deliciosas, son una excelente fuente de vitaminas, fibra y antioxidantes al igual que un elemento vital para una dieta saludable y equilibrada. A mayores, cuentan también con un importante papel en la cultura popular, la literatura y la mitología.  El mundo de las frutas es grande y diverso, cuenta con una gran variedad de sabores, colores, texturas, formas, etc. Tiene una gran importancia tanto desde el punto de vista de la nutrición como de la cultura y economía. \\\par
+    
+    La inteligencia artificial está revolucionando cada vez más el mundo de la agricultura y particularmente, el de las frutas, lo que está ayudando a mejorar la calidad y cantidad de la producción de frutas además de la reducción de los costes. Por ejemplo, el control de calidad de los productos frescos es un problema bastante complejo debido a la gran cantidad y diversidad de ellos que existen. Sin embargo se puede llevar a cabo con facilidad gracias a la inteligencia artificial. \\ \par
+    
+    Nuestro objetivo es desarrollar un problema que identifique distintas frutas a partir de imágenes de las mismas. A pesar de que en un principio solo identificará frutas básicas, en un futuro puede ser de gran utilidad en la industria agrícola y alimentaria en aspectos como el control de calidad, la automatización de la clasificación y etiquetado de las frutas, además de otros posibles usos que puedan surgir en el futuro. \\ \par 
+
+    En resumen, el uso de inteligencia artificial en el mundo de las frutas, y, concretamente, el uso un sistema de identificación de frutas puede ayudar en gran medida a los agricultores y productores de alimentos a optimizar la producción de frutas, mejorar la calidad de frutas, reducir el desperdicio, etc.  \\ \par 
+
+    En esta memoria comenzaremos tratando el problema a resolver incluyendo una descripción del mismo, las distintas restricciones de la base de datos, y una breve definición de la misma. Posteriormente se lleva a cabo un breve análisis bibliográfico de artículos similares. Lo siguiente es definir las distintas aproximaciones del problema % AQUI HAY QUE EXPLICAR QUE COJONES VAMOS A HACER PORQUE SINCERAMENTE NO TENGO NI IDEA XD% 
+    Por último, terminaremos la memoria con una solución al problema y un apartado de conclusiones finales y trabajo futuro.
+    
+\section{Problema a resolver}
+\subsection{Descripción}
+
+    En esta memoria, proponemos un sistema sencillo y eficiente de identificación y clasificación de frutas por medio de un sistema de inteligencia artificial configurado para esta tarea. El objetivo principal de este trabajo es el de aplicar técnicas y metodologías de aprendizaje automático a dos categorías de frutas: manzanas y plátanos. Con el método propuesto, se podrán reconocer las mejores características identificativas de una serie de imágenes preprocesadas, como color y forma, y lograr escalar el sistema para añadir otras frutas en el futuro.
+    
+\subsection{Restricciones}
+
+    Para la base de datos propuesta, se han seleccionado las imágenes más significativas, eliminando aquellas que puedan dar lugar a confusión o que no mostraban a los sujetos de interés. Para las imágenes se han impuesto las siguientes restricciones:
+    
+    \begin{outline}
+        \1 Las imágenes deben ser a color.
+        \1 Independientemente de su tamaño u orientación, todas las imágenes deben mostrar al sujeto aislado sobre un fondo blanco.
+        \1 No deben presentar daños visibles (deshidratación, plagas, moho, etc.) que puedan alterar la percepción natural de la fruta evaluada.
+        \1 Las frutas deben mostrarse completas, sin cortes o golpes que alteren su forma habitual.
+        \1 En caso de frutas que suelan aparecer en grupo (i.e. plátanos, uvas, etc.), se seleccionarán solo aquellas en las que aparezcan en unidades individuales
+    \end{outline}
+    Para un ejemplo, véase la Figura \ref{fig:ieplatano}.
+    
+    \begin{figure}[!b]
+        \centering
+        \includegraphics[scale=0.6]{ejemplo_platano.png}
+        \caption{Ejemplo de imagen aceptada de la base de datos.}
+        \label{fig:ieplatano}
+    \end{figure}
+
+\subsection{Base de datos}
+
+La base de datos consta de 464 imágenes sobre las frutas que queremos distinguir (320 manzanas y 144 plátanos), todas ellas cumpliendo con las restricciones descritas en el apartado anterior. Las imágenes están en formato JPG y tienen tamaños variables, con dos núcleos concentrados en los 7 y 30Kb. Con la resolución ocurre algo parecido, siendo la mayoría de 250x250 o 400x250. Más adelante se especificarán las características que se extraerán de las imágenes para su clasificación. \\ \par
+
+Estas imágenes se han extraído a partir de otra base de datos \cite{BD} con un total de 225640 imágenes sobre 262 frutas diferentes, ocupando un total de 7GB. De esta base de datos, se han seleccionado las imágenes más significativas, como se ha mencionado anteriormente. \\ \par
+
+También es importante mencionar la naturaleza RGB del color de las imágenes. Esto significa que se puede expresar mediante tres variables, cuyos valores están comprendidos entre 0 y 255 para el rojo, verde, y azul. \\ \par
+
+
+
+\section{Análisis bibliográfico. Estado del arte}
+\subsection{Trabajos relacionados}
+
+%revisar citations & añadir en introducción 
+%formato : nombre (año) <resumen> []
+%añadir propuestas utilizamos algun trabajo como comparador?, aprendimos algo en específico? usaremos alguna técnica? (complicado por la dificultad técnica)
+%añadir pagina web a la biblio
+%ana.porto.p
+
+Como mencionado anteriormente, es de interés el uso que se le puede dar a la inteligencia artificial al ámbito de la agricultura, por lo que no es de sorprender que existan numerosos artículos relacionados con el tema central de nuestra memoria, aunque sea con ligeras variaciones, como la especialización en identificación de una única fruta \cite{agriculture12060756} o la puntuación de una fruta según sus características a ojos de clientes \cite{8488544}.\\
+
+Ya existen artículos centrados en hacer un análisis exhaustivo del estado actual de la identificación y clasificación de frutas (y verduras) \cite{artbeh:Behera2020}. 
+Se identifica una tendencia hacia el uso de redes neuronales convolucionales para la clasificación de frutas, como se puede observar en artículos \cite{artin:INDIRA2021}, donde se resalta la utilidad de este tipo de redes neuronales para llevar a cabo la diferenciación de frutas, mas allá de las aparentes similaridades, otros \cite{8729435} donde partiendo del uso de CNNs se intenta encontrar una arquitectura óptima, incluso otros que van más allá del diseño y entrenamiento del sistema inteligente para proponer implentaciones útiles de cara a la industria \cite{Yang2022}.
+Existen distintos focos de atención, especialmente en algo que nos interesa mucho, como es la extracción de características \cite{8074025}.\\ 
+
+Pese a que el método tradicional que planteamos utilizar no suscita tanto interés, siguen apareciendo artículos analizando y documentando este proceso, centrándose en características como simetrías, análisis del espectrograma o extracción de texturas \cite{10046437}.
+Es innegable la utilidad e interés del estudio en esta ámbito específico, aunque si que la mayoría, al menos recientemente, se centra alrededor de las redes neuronales convolucionales.
+
+\newpage
+
+\nocite{*}
+\bibliography{citations/referencias}
+\bibliographystyle{ieeetr}
+\end{document}
