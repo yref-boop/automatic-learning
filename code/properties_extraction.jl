@@ -40,11 +40,56 @@ blue_matrix = (blue_channel.>(green_channel.+minimal_difference)) .& (blue_chann
 yellow_matrix = (green_channel.>(blue_channel.+0.1)) .& (red_channel.>(blue_channel.+0.1))
 
 
+"""
+las imagenes se trataran de tal forma que primero se escoja el color principal y a partir de ahi se depurarán posibles artefactos, para poder tratar la imagen de la forma mas limpia posible, evitando posibles detecciones fuera de la fruta como tal
+"""
 
 
+# get the most representative matrix:
+ function most_common(red_matrix, green_matrix, blue_matrix, yellow_matrix)
+    maximum_value = max(sum(red_matrix),sum(green_matrix),sum(blue_matrix),sum(yellow_matrix))
+    if maximum_value == sum(red_matrix)
+        red_matrix
+    else
+        if maximum_value == sum(green_matrix)
+            green_matrix
+        else
+            if maximum_value == sum(blue_matrix)
+                blue_matrix
+            else
+                yellow_matrix
+            end
+        end
+    end
+end
+
+umbral_matrix = most_common(red_matrix, green_matrix, blue_matrix, yellow_matrix)
+
+# recognize objects inside this umbral matrix
+labelArray = ImageMorphology.label_components(umbral_matrix);
+
+# extra data that can be extracted
+boundingBoxes = ImageMorphology.component_boxes(labelArray);
+sizes = ImageMorphology.component_lengths(labelArray);
+pixels = ImageMorphology.component_indices(labelArray);
+pixels = ImageMorphology.component_subscripts(labelArray);
+centroids = ImageMorphology.component_centroids(labelArray);
+
+# to erase noise-like small objects:
+minimum_size = 30
+
+sizes = component_lengths(labelArray)
+clean_labels = findall(sizes .<= minimum_size) .- 1;
+boolean_matrix = [!in(label,clean_labels) && (label!=0) for label in labelArray];
+
+# in our specific case, maybe just storing the biggest element would be enough
+labelArray = ImageMorphology.label_components(boolean_matrix)
 
 
+"""
+leyendo la literatura relacionada y tras analizar el problema, llegamos a la conclusion de la importancia que tienen las simetrias, tanto verticales como horizontales a la hora de distinguir entre estas dos frutas
+resulta especialmente util para discernir ambas figuras facilmente
+"""
 
-
-
+# to get the centroid
 
