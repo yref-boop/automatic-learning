@@ -41,7 +41,7 @@ yellow_matrix = (green_channel.>(blue_channel.+0.1)) .& (red_channel.>(blue_chan
 
 
 """
-las imagenes se trataran de tal forma que primero se escoja el color principal y a partir de ahi se depurarán posibles artefactos, para poder tratar la imagen de la forma mas limpia posible, evitando posibles detecciones fuera de la fruta como tal
+las imagenes se trataran de tal forma que se escoja el color principal
 """
 
 
@@ -63,33 +63,51 @@ las imagenes se trataran de tal forma que primero se escoja el color principal y
     end
 end
 
-umbral_matrix = most_common(red_matrix, green_matrix, blue_matrix, yellow_matrix)
+bolean_matrix = most_common(red_matrix, green_matrix, blue_matrix, yellow_matrix)
 
-# recognize objects inside this umbral matrix
-labelArray = ImageMorphology.label_components(umbral_matrix);
-
-# extra data that can be extracted
-boundingBoxes = ImageMorphology.component_boxes(labelArray);
-sizes = ImageMorphology.component_lengths(labelArray);
-pixels = ImageMorphology.component_indices(labelArray);
-pixels = ImageMorphology.component_subscripts(labelArray);
-centroids = ImageMorphology.component_centroids(labelArray);
-
-# to erase noise-like small objects:
-minimum_size = 30
-
-sizes = component_lengths(labelArray)
-clean_labels = findall(sizes .<= minimum_size) .- 1;
-boolean_matrix = [!in(label,clean_labels) && (label!=0) for label in labelArray];
-
-# in our specific case, maybe just storing the biggest element would be enough
-labelArray = ImageMorphology.label_components(boolean_matrix)
-
-
+# muchisimo texto hacer lo de las simetrias, lo dejamos para la siguiente iteracion ok?
 """
-leyendo la literatura relacionada y tras analizar el problema, llegamos a la conclusion de la importancia que tienen las simetrias, tanto verticales como horizontales a la hora de distinguir entre estas dos frutas
-resulta especialmente util para discernir ambas figuras facilmente
+dada la simpleza de los datos extraidos, al menos en esta iteracion, resulta de interes suponer un sistema inteligente extremadamenta básico, que proponga el tipo de fruta en base al color detectado en la figura de tal forma que:
+
+red_matrix      -> apple
+green_matrix    -> apple
+yellow_matrix   -> banana
+
+esta relacion obviamente no recoge sutilezas suficientes (existen platanos verdes y manzanas amarillas) pero dados los datos es posible que ssea util
 """
 
-# to get the centroid
+# aproximacion pocha artesanal:
+function identify(image)
+    minimal_difference = 0.3
 
+    red_channel = red.(image)
+    green_channel = green.(image)
+    blue_channel = blue.(image)
+
+    red_matrix = (red_channel.>green_channel) .& (red_channel.>(blue_channel));
+
+    green_matrix = (green_channel.>red_channel) .& (green_channel.>(blue_channel));
+
+    blue_matrix = (blue_channel.>green_channel) .& (blue_channel.>(red_channel));
+
+    yellow_matrix = (green_channel.>blue_channel) .& (red_channel.>blue_channel) .& ((green_channel.-red_channel).<minimal_difference) .& ((red_channel.-green_channel).<minimal_difference)
+
+    function most_common(red_matrix, green_matrix, blue_matrix, yellow_matrix)
+        maximum_value = max(sum(red_matrix),sum(green_matrix),sum(blue_matrix),sum(yellow_matrix))
+        if maximum_value == sum(red_matrix)
+            "manzana roja"
+        else
+            if maximum_value == sum(green_matrix)
+                "manzana verde"
+            else
+                if maximum_value == sum(blue_matrix)
+                    "???"
+                else
+                    "banana amarilla"
+                end
+            end
+        end
+    end
+
+    return most_common(red_matrix, green_matrix, blue_matrix, yellow_matrix)
+end;
