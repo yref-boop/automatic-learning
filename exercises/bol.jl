@@ -169,11 +169,11 @@ Función sobrecargada donde las salidas no se han interpretado como valores bool
 accuracy(targets::AbstractArray{Bool,1}, outputs::AbstractArray{<:Real,1}, threshold = 0.5) = 
     accuracy((outputs .>= threshold), targets)
 
-"""
-Función sobrecarga donde las salidas reales no se han interpretado todavía como valores
-de pertenencia a N clases.
-"""
 function accuracy(targets::AbstractArray{Bool,2}, outputs::AbstractArray{<:Real,2})
+    """
+    Función sobrecarga donde las salidas reales no se han interpretado todavía como valores
+    de pertenencia a N clases.
+    """
     if size(outputs, 2) == 1
         return accuracy(targets[:,1], outputs[:,1])
     else
@@ -183,7 +183,7 @@ end
 
 # RNA
 
-function rna(topology::AbstractArray{<:Int,1}, n_inputs, n_outputs)
+function ann(topology::AbstractArray{<:Int,1}, n_inputs, n_outputs)
     ann = Chain();
     n_inputs_layer = n_inputs
 
@@ -195,16 +195,50 @@ function rna(topology::AbstractArray{<:Int,1}, n_inputs, n_outputs)
     n_outputs <= 2 ? 
         ann = Chain(ann...,  Dense(n_inputs_layer, 1, σ)) : 
         ann = Chain(ann...,  Dense(n_inputs_layer, n_outputs, identity), softmax)
-    
     return ann
 end;
 
+function ann_train(
+    topology::AbstractArray{<:Int, 1}, dataset::Tuple{AbstractArray{<:Real,2}, AbstractArray{Bool,2}},
+    max_epochs::Int = 1000, min_loss::Real = 0, learning_rate::Real = 0.01
+)
+    """
+    Crea y entrena una RNA para realizar clasificación.
+    """
+    inputs, targets = dataset
+    rna = ann(topology, size(inputs)[2], size(targets)[2])
+    loss(x, y) = (size(targets)[2] == 1) ? Flux.Losses.binarycrossentropy(rna(x),y) : Flux.Losses.crossentropy(rna(x),y)
+    optimizer = ADAM(learning_rate)
+    losses = []
+
+    for epoch in 1:max_epochs
+        print("Iteración ", epoch, "\n")
+        Flux.train!(loss, Flux.params(rna), [(inputs', targets')], optimizer)
+        push!(losses, loss(inputs', targets'))
+        if losses[end] <= min_loss
+            break
+        end
+    end
+
+    return rna, losses
+end
+
+ann_train(
+    topology::AbstractArray{<:Int, 1}, dataset::Tuple{AbstractArray{<:Real,2}, AbstractArray{Bool,1}},
+    max_epochs::Int = 1000, min_loss::Real = 0, learning_rate::Real = 0.01
+) = ann_train(topology, (dataset[1], reshape(dataset[2], :, 1)), max_epochs, min_loss, learning_rate)
+    
 # Dataset
 
 dataset = readdlm("iris.data", ',')
 targets = dataset[:, 5]
-targets_classes = unique(targets)
-
 inputs = Float32.(dataset[:, 1:4])
+
+topology = [2];
+
 normalized_inputs = normalize_zeromean!(inputs, calculate_minmax_normalization_parameters(inputs))
-encoded_targets = one_hot_encoding(targets, targets_classes)
+encoded_targets = one_hot_encoding(targets)
+
+rna, losses = ann_train(topology, (normalized_inputs, encoded_targets))
+
+print(rna, "\n\n", losses)
