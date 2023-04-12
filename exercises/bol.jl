@@ -65,19 +65,20 @@ end
 Función sobrecargada de normalize_zeromean!, con un único parámetro que calcule los parámetros
 de normalización automáticamente.
 """
-normalize_zeromean!(inputs::AbstractArray{<:Real,2}) = normalize_zeromean!(inputs, calculate_zeromean_normalization_parameters(inputs))
+normalize_zeromean!(inputs::AbstractArray{<:Real,2}) = 
+    normalize_zeromean!(inputs, calculate_zeromean_normalization_parameters(inputs))
 
 function normalize_zeromean(inputs::AbstractArray{<:Real,2}, meanstd::NTuple{2, AbstractArray{<:Real,2}})
     """
     Misma función que normalize_zeromean! pero sin modificar la matriz de datos.
     """
     return normalize_zeromean!(copy(inputs), meanstd)
-end;
+end
 
 """
 Misma función sobrecargada que normalize_zeromean! pero sin modificar la matriz de datos.
 """
-normalize_zeromean(inputs::AbstractArray{<:Real,2}) = normalize_zeromean!(copy(inputs));
+normalize_zeromean(inputs::AbstractArray{<:Real,2}) = normalize_zeromean!(copy(inputs))
 
 # Normalización con máximo y mínimo
 
@@ -106,7 +107,8 @@ end
 Función sobrecargada de normalize_minmax!, con un único parámetro que calcule los parámetros
 de normalización automáticamente.
 """
-normalize_minmax!(inputs::AbstractArray{<:Real,2}) = normalize_minmax!(inputs, calculate_minmax_normalization_parameters(inputs))
+normalize_minmax!(inputs::AbstractArray{<:Real,2}) = 
+    normalize_minmax!(inputs, calculate_minmax_normalization_parameters(inputs))
 
 function normalize_minmax(inputs::AbstractArray{<:Real,2}, minmax::NTuple{2, AbstractArray{<:Real,2}})
     """
@@ -122,7 +124,7 @@ normalize_minmax(inputs::AbstractArray{<:Real,2}) = normalize_minmax!(copy(input
 
 # Clasificar salidas
 
-function classify_outputs(outputs::AbstractArray{<:Real,2}, threshold = 0.5)
+function classify_outputs(outputs::AbstractArray{<:Real,2}; threshold = 0.5)
     """
     Recibe como entrada una matriz de salidas de un modelo y devuelve una matriz de booleanos
     del mismo tamaño, donde cada fila tiene un único valor true que indica la clase a la que se 
@@ -166,7 +168,7 @@ end
 """
 Función sobrecargada donde las salidas no se han interpretado como valores booleanos.
 """
-accuracy(targets::AbstractArray{Bool,1}, outputs::AbstractArray{<:Real,1}, threshold = 0.5) = 
+accuracy(targets::AbstractArray{Bool,1}, outputs::AbstractArray{<:Real,1}; threshold = 0.5) = 
     accuracy((outputs .>= threshold), targets)
 
 function accuracy(targets::AbstractArray{Bool,2}, outputs::AbstractArray{<:Real,2})
@@ -183,62 +185,175 @@ end
 
 # RNA
 
-function ann(topology::AbstractArray{<:Int,1}, n_inputs, n_outputs)
-    ann = Chain();
+function build_class_ann(topology::AbstractArray{<:Int,1}, n_inputs::Int, n_outputs)
+    ann = Chain()
     n_inputs_layer = n_inputs
 
     for n_outputs_layer = topology
-        ann = Chain(ann..., Dense(n_inputs_layer, n_outputs_layer, σ) );
-        n_inputs_layer = n_outputs_layer;
+        ann = Chain(ann..., Dense(n_inputs_layer, n_outputs_layer, σ) )
+        n_inputs_layer = n_outputs_layer
     end
     
     n_outputs <= 2 ? 
         ann = Chain(ann...,  Dense(n_inputs_layer, 1, σ)) : 
         ann = Chain(ann...,  Dense(n_inputs_layer, n_outputs, identity), softmax)
     return ann
-end;
+end
 
-function ann_train(
-    topology::AbstractArray{<:Int, 1}, dataset::Tuple{AbstractArray{<:Real,2}, AbstractArray{Bool,2}},
-    max_epochs::Int = 1000, min_loss::Real = 0, learning_rate::Real = 0.01
+function train_class_ann(
+    topology::AbstractArray{<:Int, 1}, train_set::Tuple{AbstractArray{<:Real,2}, AbstractArray{Bool,2}};
+    val_set::Tuple{AbstractArray{<:Real, 2}, AbstractArray{Bool, 2}} = tuple(zeros(0, 0), falses(0, 0)),
+    test_set::Tuple{AbstractArray{<:Real, 2}, AbstractArray{Bool, 2}} = tuple(zeros(0, 0), falses(0, 0)),
+    max_epochs::Int = 1000, max_epochs_val::Int = 20, min_loss::Real = 0, learning_rate::Real = 0.01
 )
     """
-    Crea y entrena una RNA para realizar clasificación.
+    Crea y entrena una RNA de clasificación con una arquitectura especificada utilizando un conjunto de datos de entrenamiento.
+    Utiliza el algoritmo de optimización ADAM para minimizar la función de pérdida de la RNA en cada iteración.
+    También puede utilizar conjuntos de datos de validación y de prueba para evaluar la precisión de la RNA durante el entrenamiento.
+
+    Si el rendimiento de la RNA en el conjunto de validación no mejora durante max_epochs_val iteraciones consecutivas, el entrenamiento 
+    se detiene para evitar el sobreajuste. También se puede detener si la pérdida en el conjunto de entrenamiento cae por debajo del valor 
+    mínimo especificado.
+
+    La función devuelve la RNA entrenada y los valores de pérdida en cada conjunto de datos en forma de vectores 
+    (losses_train, losses_val, y losses_test).
     """
-    inputs, targets = dataset
-    rna = ann(topology, size(inputs)[2], size(targets)[2])
-    loss(x, y) = (size(targets)[2] == 1) ? Flux.Losses.binarycrossentropy(rna(x),y) : Flux.Losses.crossentropy(rna(x),y)
+    inputs, targets = train_set
+    rna = build_class_ann(topology, size(inputs)[2], size(targets)[2])
+    loss(x, y) = (size(targets)[2] == 1) ? Flux.Losses.binarycrossentropy(rna(x), y) : Flux.Losses.crossentropy(rna(x), y)
     optimizer = ADAM(learning_rate)
-    losses = []
+    losses_train, losses_val, losses_test = [], [], []
+    best_loss_val, no_improve, best_epoch = Inf, 0, 0
+    best_rna = deepcopy(rna)
 
     for epoch in 1:max_epochs
         print("Iteración ", epoch, "\n")
         Flux.train!(loss, Flux.params(rna), [(inputs', targets')], optimizer)
-        push!(losses, loss(inputs', targets'))
-        if losses[end] <= min_loss
+        push!(losses_train, loss(inputs', targets'))
+
+        if !isempty(val_set[1])
+            loss_val = loss(val_set[1]', val_set[2]')
+            push!(losses_val, loss_val)
+
+            if loss_val < best_loss_val
+                best_loss_val = loss_val
+                best_rna = deepcopy(rna)
+                best_epoch = epoch
+                no_improve = 0
+            else
+                no_improve += 1
+            end
+
+            if no_improve >= max_epochs_val
+                break
+            end
+        end
+
+        if !isempty(test_set[1])
+            push!(losses_test, loss(test_set[1]', test_set[2]'))
+        end
+
+        if losses_train[end] <= min_loss
             break
         end
     end
 
-    return rna, losses
+    if !isempty(val_set[1])
+        rna = best_rna
+    end
+
+    if isempty(losses_val)
+        return rna, losses_train, losses_test
+    else
+        print("best rna achieved at epoch ", best_epoch, "\n")
+        return rna, losses_train, losses_val, losses_test
+    end
 end
 
-ann_train(
-    topology::AbstractArray{<:Int, 1}, dataset::Tuple{AbstractArray{<:Real,2}, AbstractArray{Bool,1}},
-    max_epochs::Int = 1000, min_loss::Real = 0, learning_rate::Real = 0.01
-) = ann_train(topology, (dataset[1], reshape(dataset[2], :, 1)), max_epochs, min_loss, learning_rate)
-    
+function train_class_ann(
+    topology::AbstractArray{<:Int, 1}, train_set::Tuple{AbstractArray{<:Real,2}, AbstractArray{Bool,1}};
+    val_set::Tuple{AbstractArray{<:Real,2}, AbstractArray{Bool,1}} = tuple(zeros(0,0), falses(0)),
+    test_set::Tuple{AbstractArray{<:Real,2}, AbstractArray{Bool,1}} = tuple(zeros(0,0), falses(0)),
+    max_epochs::Int = 1000, max_epochs_val = 20, min_loss::Real = 0, learning_rate::Real = 0.01
+)
+    if !isempty(val_set[1])
+        val_set = tuple(val_set[1], reshape(val_set[2], (length(val_set[2]), 1)))
+    end 
+
+    if !isempty(test_set)
+        test_set = tuple(test_set[1], reshape(test_set[2], (length(test_set[2]), 1)))
+    end
+
+    return ann_train(topology, (train_set[1], reshape(train_set[2], :, 1)), 
+        val_set, test_set, max_epochs, max_epochs_val, min_loss, learning_rate)
+end
+
+# Hold-out
+
+function hold_out(n_samples::Int, test_ratio::Float64)
+    """
+    Separa un conjunto de datos en dos subconjuntos, uno para entrenamiento y otro para prueba,
+    utilizando una proporción dada y generando índices aleatorios para seleccionar las muestras 
+    para cada subconjunto. 
+    Devuelve los índices de los patrones de entramiento y los de test, en ese orden.
+    """
+    index = randperm(n_samples)
+    n_test = round(Int, n_samples*test_ratio)
+
+    return (index[n_test + 1:end], index[1:n_test])
+end
+
+function hold_out(n_samples::Int, val_ratio::Float64, test_ratio::Float64)
+    """
+    Basándose en la función hold_out anterior, devuelve una tupla con tres vectores que contienen
+    los índices de los patrones para los conjuntos de entrenamiento, validación y test.
+    """
+    index = randperm(n_samples)
+    n_val = round(Int, n_samples*val_ratio)
+    n_test = round(Int, n_samples*test_ratio)
+
+    return (index[n_val + n_test + 1:end], index[n_test + 1:n_val + n_test], index[1:n_test])
+end
+
+# Plot
+
+function plot_losses(losses_train, losses_val, losses_test)
+    plot(
+        x_label="Iteraciones",
+        y_label="Pérdida",
+        x_lims=(0, length(losses_train)),
+        y_lims=(minimum([losses_train; losses_val; losses_test]), maximum([losses_train; losses_val; losses_test])),
+        legend=:topleft,
+        title="Evolución de los valores de loss",
+        size=(800, 500),
+    )
+    plot!(losses_train, label="Entrenamiento")
+    plot!(losses_val, label="Validación")
+    plot!(losses_test, label="Prueba")
+end
+
+
 # Dataset
 
-dataset = readdlm("iris.data", ',')
-targets = dataset[:, 5]
-inputs = Float32.(dataset[:, 1:4])
+begin
+    dataset = readdlm("iris.data", ',')
+    targets = dataset[:, 5]
+    encoded_targets = one_hot_encoding(targets)
+    inputs = Float32.(dataset[:, 1:4])
 
-topology = [2];
+    topology = [2];
 
-normalized_inputs = normalize_zeromean!(inputs, calculate_minmax_normalization_parameters(inputs))
-encoded_targets = one_hot_encoding(targets)
+    index_train, index_val, index_test = hold_out(size(inputs)[1], 0.2, 0.1)
+    inputs_train, targets_train = inputs[index_train, :], encoded_targets[index_train, :]
+    inputs_val, targets_val = inputs[index_val, :], encoded_targets[index_val, :]
+    inputs_test, targets_test = inputs[index_test, :], encoded_targets[index_test, :]
 
-rna, losses = ann_train(topology, (normalized_inputs, encoded_targets))
+    normalization_parameters = calculate_zeromean_normalization_parameters(inputs_train)
+    normalized_inputs_train = normalize_zeromean!(inputs_train, normalization_parameters)
+    normalized_inputs_val = normalize_zeromean!(inputs_val, normalization_parameters)
+    normalized_inputs_test = normalize_zeromean!(inputs_test, normalization_parameters)
 
-print(rna, "\n\n", losses)
+    rna, losses_train, losses_val, losses_test =  train_class_ann(topology, (inputs_train, targets_train), val_set = (inputs_val, targets_val), test_set = (inputs_test, targets_test), max_epochs = 10000, max_epochs_val = 20, min_loss = 0, learning_rate = 0.01)
+
+    plot_losses(losses_train, losses_val, losses_test)
+end
