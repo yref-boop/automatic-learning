@@ -650,6 +650,7 @@ function modelCrossValidation(modelType::Symbol, modelHyperparameters::Dict, inp
     testF1         = Array{Float64,1}(undef, numFolds);
 
     local finalAnn;
+    local testOuts;
 
     # Para cada fold, entrenamos
     for numFold in 1:numFolds
@@ -676,6 +677,7 @@ function modelCrossValidation(modelType::Symbol, modelHyperparameters::Dict, inp
 
             # Pasamos el conjunto de test
             testOutputs = predict(model, testInputs);
+            testOuts = testOutputs;
 
             # Calculamos las metricas correspondientes con la funcion desarrollada en la practica anterior
             (acc, _, _, _, _, _, F1, _) = confusionMatrix(testOutputs, testTargets);
@@ -729,6 +731,8 @@ function modelCrossValidation(modelType::Symbol, modelHyperparameters::Dict, inp
             end;
 
             # Calculamos el valor promedio & matrices de confusion de todos los entrenamientos de este fold
+            print(collect(ann(testInputs')'));
+            print(testTargets);
             printConfusionMatrix(collect(ann(testInputs')'), testTargets);
 
             finalAnn = ann;
@@ -741,9 +745,13 @@ function modelCrossValidation(modelType::Symbol, modelHyperparameters::Dict, inp
         testAccuracies[numFold] = acc;
         testF1[numFold]         = F1;
 
-        println("Results in test in fold ", numFold, "/", numFolds, ": accuracy: ", 100*testAccuracies[numFold], " %, F1: ", 100*testF1[numFold], " %");
+        # printear matriz de confusion para el resto de arquitecturas
 
-        #printConfusionMatrix(collect(finalAnn(testInputs')'), testTargets);
+        if (!(modelType==:ANN))
+           printConfusionMatrix(hcat(collect(testOuts.=="banana")),hcat(collect(testTargets.=="banana")));
+        end;
+
+        println("Results in test in fold ", numFold, "/", numFolds, ": accuracy: ", 100*testAccuracies[numFold], " %, F1: ", 100*testF1[numFold], " %");
 
     end; # for numFold in 1:numFolds
 
