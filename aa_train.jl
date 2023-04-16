@@ -827,7 +827,7 @@ modelHyperparameters["numExecutions"] = numRepetitionsANNTraining;
 modelHyperparameters["maxEpochs"] = numMaxEpochs;
 modelHyperparameters["maxEpochsVal"] = maxEpochsVal;
 println("\nRNA ----------------\n")
-modelCrossValidation(:ANN, modelHyperparameters, inputs, targets, crossValidationIndices);
+(ANNtestAccuracies, _, ANNtestF1, _) = modelCrossValidation(:ANN, modelHyperparameters, inputs, targets, crossValidationIndices);
 
 # Entrenamos las SVM
 modelHyperparameters = Dict();
@@ -836,12 +836,32 @@ modelHyperparameters["kernelDegree"] = kernelDegree;
 modelHyperparameters["kernelGamma"] = kernelGamma;
 modelHyperparameters["C"] = C;
 println("\nSVM ----------------\n")
-modelCrossValidation(:SVM, modelHyperparameters, inputs, targets, crossValidationIndices);
+(SVMtestAccuracies, _, SVMtestF1, _) = modelCrossValidation(:SVM, modelHyperparameters, inputs, targets, crossValidationIndices);
 
 # Entrenamos los arboles de decision
 println("\nDT ----------------\n")
-modelCrossValidation(:DecisionTree, Dict("maxDepth" => maxDepth), inputs, targets, crossValidationIndices);
+(DTtestAccuracies, _, DTtestF1, _) = modelCrossValidation(:DecisionTree, Dict("maxDepth" => maxDepth), inputs, targets, crossValidationIndices);
 
 # Entrenamos los kNN
 println("\nkNN ----------------\n")
-modelCrossValidation(:kNN, Dict("numNeighbors" => numNeighbors), inputs, targets, crossValidationIndices);
+(KNNtestAccuracies, _, KNNtestF1, _) = modelCrossValidation(:kNN, Dict("numNeighbors" => numNeighbors), inputs, targets, crossValidationIndices);
+
+println(" BEST ARCHITECTURE: ");
+    maxAcc = max(KNNtestAccuracies, DTtestAccuracies, SVMtestAccuracies, ANNtestAccuracies);
+    if (maxAcc == KNNtestAccuracies)
+        println("kNN");
+        return
+    end
+    if (maxAcc == DTtestAccuracies)
+        println("Decision Trees");
+        return
+    end
+    if (maxAcc == SVMtestAccuracies)
+        println("SVM");
+        return
+    end
+    if (maxAcc == ANNtestAccuracies)
+        println("ANN");
+        return
+    end
+
