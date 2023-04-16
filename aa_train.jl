@@ -649,6 +649,8 @@ function modelCrossValidation(modelType::Symbol, modelHyperparameters::Dict, inp
     testAccuracies = Array{Float64,1}(undef, numFolds);
     testF1         = Array{Float64,1}(undef, numFolds);
 
+    local finalAnn;
+
     # Para cada fold, entrenamos
     for numFold in 1:numFolds
 
@@ -694,6 +696,8 @@ function modelCrossValidation(modelType::Symbol, modelHyperparameters::Dict, inp
             testAccuraciesEachRepetition = Array{Float64,1}(undef, modelHyperparameters["numExecutions"]);
             testF1EachRepetition         = Array{Float64,1}(undef, modelHyperparameters["numExecutions"]);
 
+            local ann;
+
             # Se entrena las veces que se haya indicado
             for numTraining in 1:modelHyperparameters["numExecutions"]
 
@@ -706,19 +710,17 @@ function modelCrossValidation(modelType::Symbol, modelHyperparameters::Dict, inp
                     # Con estos indices, se pueden crear los vectores finales que vamos a usar para entrenar una RNA
 
                     # Entrenamos la RNA, teniendo cuidado de codificar las salidas deseadas correctamente
-                    ann, = trainClassANN(modelHyperparameters["topology"], (trainingInputs[trainingIndices,:],   trainingTargets[trainingIndices,:]),
+                    ann = trainClassANN(modelHyperparameters["topology"], (trainingInputs[trainingIndices,:],   trainingTargets[trainingIndices,:]),
                         validationDataset = (trainingInputs[validationIndices,:], trainingTargets[validationIndices,:]),
                         testDataset =       (testInputs,                          testTargets);
-                        maxEpochs=modelHyperparameters["maxEpochs"], learningRate=modelHyperparameters["learningRate"], maxEpochsVal=modelHyperparameters["maxEpochsVal"]);
-
+                        maxEpochs=modelHyperparameters["maxEpochs"], learningRate=modelHyperparameters["learningRate"], maxEpochsVal=modelHyperparameters["maxEpochsVal"])[1];
                 else
 
                     # Si no se desea usar conjunto de validacion, se entrena unicamente con conjuntos de entrenamiento y test,
                     #  teniendo cuidado de codificar las salidas deseadas correctamente
-                    ann, = trainClassANN(modelHyperparameters["topology"], (trainingInputs, trainingTargets),
+                    ann = trainClassANN(modelHyperparameters["topology"], (trainingInputs, trainingTargets),
                         testDataset = (testInputs,     testTargets);
-                        maxEpochs=modelHyperparameters["maxEpochs"], learningRate=modelHyperparameters["learningRate"]);
-
+                    maxEpochs=modelHyperparameters["maxEpochs"], learningRate=modelHyperparameters["learningRate"])[1];
                 end;
 
                 # Calculamos las metricas correspondientes con la funcion desarrollada en la practica anterior
@@ -726,7 +728,10 @@ function modelCrossValidation(modelType::Symbol, modelHyperparameters::Dict, inp
 
             end;
 
-            # Calculamos el valor promedio de todos los entrenamientos de este fold
+            # Calculamos el valor promedio & matrices de confusion de todos los entrenamientos de este fold
+            printConfusionMatrix(collect(ann(testInputs')'), testTargets);
+
+            finalAnn = ann;
             acc = mean(testAccuraciesEachRepetition);
             F1  = mean(testF1EachRepetition);
 
@@ -737,6 +742,8 @@ function modelCrossValidation(modelType::Symbol, modelHyperparameters::Dict, inp
         testF1[numFold]         = F1;
 
         println("Results in test in fold ", numFold, "/", numFolds, ": accuracy: ", 100*testAccuracies[numFold], " %, F1: ", 100*testF1[numFold], " %");
+
+        #printConfusionMatrix(collect(finalAnn(testInputs')'), testTargets);
 
     end; # for numFold in 1:numFolds
 
@@ -789,7 +796,7 @@ maxDepth = 4;
 numNeighbors = 3;
 
 # Cargamos el dataset
-dataset = readdlm("data\\datasets\\fruits.data",',');
+dataset = readdlm("data/datasets/fruits.data",',');
 # Preparamos las entradas y las salidas deseadas
 inputs = convert(Array{Float32,2}, dataset[:,1:3]);
 targets = dataset[:,4];
