@@ -858,10 +858,21 @@ println(" BEST ARCHITECTURE: ");
     end
     if (maxAcc == SVMtestAccuracies)
         println("SVM");
+        println("kernel: " + kernel);
+        println("kernelDegree: " + kernelDegree);
+        println("kernelGamma:  " + kernelGamma);
+        println("C: " + C);
+
         return
     end
     if (maxAcc == ANNtestAccuracies)
         println("ANN");
+        println("configuración de las capas: " + topology);
+        println("tasa de aprendizaje" + learningRate);
+        println("numero maximo de ciclos de entrenamiento" + numMaxEpochs);
+        println("porcentaje de patrones que se usaran para validacion: "+ validationRatio);
+        println("numero de ciclos sin mejora b:" + maxEpochsVal);
+        println("numero de veces que se va a entrenar la RNA para cada fold por el hecho de ser no determinístico el entrenamiento: " + numRepetitionsANNTraining);
         return
     end
 
