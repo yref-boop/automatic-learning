@@ -328,12 +328,6 @@ function trainClassANN(topology::AbstractArray{<:Int,1}, trainingDataset::Tuple{
     return trainClassANN(topology, (trainingInputs, reshape(trainingTargets, length(trainingTargets), 1)); validationDataset=(validationInputs, reshape(validationTargets, length(validationTargets), 1)), testDataset=(testInputs, reshape(testTargets, length(testTargets), 1)), transferFunctions=transferFunctions, maxEpochs=maxEpochs, minLoss=minLoss, learningRate=learningRate, maxEpochsVal=maxEpochsVal, showText=showText);
 end;
 
-# ----------------------------------------------------------------------------------------------
-# ------------------------------------- Practica 4 ---------------------------------------------
-# ----------------------------------------------------------------------------------------------
-
-
-
 function confusionMatrix(outputs::AbstractArray{Bool,1}, targets::AbstractArray{Bool,1})
     numInstances = length(targets);
     @assert(length(outputs)==numInstances);
@@ -490,29 +484,6 @@ printConfusionMatrix(outputs::AbstractArray{<:Real,2}, targets::AbstractArray{Bo
 printConfusionMatrix(outputs::AbstractArray{Bool,1},   targets::AbstractArray{Bool,1})                      = printConfusionMatrix(reshape(outputs, :, 1), targets);
 printConfusionMatrix(outputs::AbstractArray{<:Real,1}, targets::AbstractArray{Bool,1}; threshold::Real=0.5) = printConfusionMatrix(outputs.>=threshold,    targets);
 
-# -------------------------------------------------------------------------
-# Estrategia "uno contra todos" y código de ejemplo:
-
-function oneVSall(model, inputs::AbstractArray{<:Real,2}, targets::AbstractArray{Bool,2})
-    numClasses = size(targets,2);
-    # Nos aseguramos de que hay mas de dos clases
-    @assert(numClasses>2);
-    outputs = Array{Float32,2}(undef, size(inputs,1), numClasses);
-    for numClass in 1:numClasses
-        newModel = deepcopy(model);
-        fit!(newModel, inputs, targets[:,[numClass]]);
-        outputs[:,numClass] .= newModel(inputs);
-    end;
-    # Aplicamos la funcion softmax
-    outputs = softmax(outputs')';
-    # Convertimos a matriz de valores booleanos
-    outputs = classifyOutputs(outputs);
-    classComparison = (targets .== outputs);
-    correctClassifications = all(classComparison, dims=2);
-    return mean(correctClassifications);
-end;
-
-
 function crossvalidation(N::Int64, k::Int64)
     indices = repeat(1:k, Int64(ceil(N/k)));
     indices = indices[1:N];
@@ -531,7 +502,6 @@ end;
 
 function crossvalidation(targets::AbstractArray{<:Any,1}, k::Int64)
     classes = unique(targets);
-    numClasses = length(classes);
     indices = Array{Int64,1}(undef, length(targets));
     for class in classes
         indicesThisClass = (targets .== class);
@@ -642,15 +612,11 @@ function modelCrossValidation(modelType::Symbol, modelHyperparameters::Dict, inp
     if modelType==:ANN
         targets = oneHotEncoding(targets, classes);
     end;
-    println("Tamaño de la matriz de salidas deseadas después de codificar: ", size(targets,1), "x", size(targets,2), " de tipo ", typeof(targets));
 
     # Creamos los vectores para las metricas que se vayan a usar
     # En este caso, solo voy a usar precision y F1, en otro problema podrían ser distintas
     testAccuracies = Array{Float64,1}(undef, numFolds);
     testF1         = Array{Float64,1}(undef, numFolds);
-
-    local finalAnn;
-    local testOuts;
 
     # Para cada fold, entrenamos
     for numFold in 1:numFolds
@@ -677,7 +643,6 @@ function modelCrossValidation(modelType::Symbol, modelHyperparameters::Dict, inp
 
             # Pasamos el conjunto de test
             testOutputs = predict(model, testInputs);
-            testOuts = testOutputs;
 
             # Calculamos las metricas correspondientes con la funcion desarrollada en la practica anterior
             (acc, _, _, _, _, _, F1, _) = confusionMatrix(testOutputs, testTargets);
@@ -698,8 +663,6 @@ function modelCrossValidation(modelType::Symbol, modelHyperparameters::Dict, inp
             testAccuraciesEachRepetition = Array{Float64,1}(undef, modelHyperparameters["numExecutions"]);
             testF1EachRepetition         = Array{Float64,1}(undef, modelHyperparameters["numExecutions"]);
 
-            local ann;
-
             # Se entrena las veces que se haya indicado
             for numTraining in 1:modelHyperparameters["numExecutions"]
 
@@ -712,17 +675,19 @@ function modelCrossValidation(modelType::Symbol, modelHyperparameters::Dict, inp
                     # Con estos indices, se pueden crear los vectores finales que vamos a usar para entrenar una RNA
 
                     # Entrenamos la RNA, teniendo cuidado de codificar las salidas deseadas correctamente
-                    ann = trainClassANN(modelHyperparameters["topology"], (trainingInputs[trainingIndices,:],   trainingTargets[trainingIndices,:]),
+                    ann, = trainClassANN(modelHyperparameters["topology"], (trainingInputs[trainingIndices,:],   trainingTargets[trainingIndices,:]),
                         validationDataset = (trainingInputs[validationIndices,:], trainingTargets[validationIndices,:]),
                         testDataset =       (testInputs,                          testTargets);
-                        maxEpochs=modelHyperparameters["maxEpochs"], learningRate=modelHyperparameters["learningRate"], maxEpochsVal=modelHyperparameters["maxEpochsVal"])[1];
+                        maxEpochs=modelHyperparameters["maxEpochs"], learningRate=modelHyperparameters["learningRate"], maxEpochsVal=modelHyperparameters["maxEpochsVal"]);
+
                 else
 
                     # Si no se desea usar conjunto de validacion, se entrena unicamente con conjuntos de entrenamiento y test,
                     #  teniendo cuidado de codificar las salidas deseadas correctamente
-                    ann = trainClassANN(modelHyperparameters["topology"], (trainingInputs, trainingTargets),
+                    ann, = trainClassANN(modelHyperparameters["topology"], (trainingInputs, trainingTargets),
                         testDataset = (testInputs,     testTargets);
-                    maxEpochs=modelHyperparameters["maxEpochs"], learningRate=modelHyperparameters["learningRate"])[1];
+                        maxEpochs=modelHyperparameters["maxEpochs"], learningRate=modelHyperparameters["learningRate"]);
+
                 end;
 
                 # Calculamos las metricas correspondientes con la funcion desarrollada en la practica anterior
@@ -730,12 +695,7 @@ function modelCrossValidation(modelType::Symbol, modelHyperparameters::Dict, inp
 
             end;
 
-            # Calculamos el valor promedio & matrices de confusion de todos los entrenamientos de este fold
-            print(collect(ann(testInputs')'));
-            print(testTargets);
-            printConfusionMatrix(collect(ann(testInputs')'), testTargets);
-
-            finalAnn = ann;
+            # Calculamos el valor promedio de todos los entrenamientos de este fold
             acc = mean(testAccuraciesEachRepetition);
             F1  = mean(testF1EachRepetition);
 
@@ -745,12 +705,6 @@ function modelCrossValidation(modelType::Symbol, modelHyperparameters::Dict, inp
         testAccuracies[numFold] = acc;
         testF1[numFold]         = F1;
 
-        # printear matriz de confusion para el resto de arquitecturas
-
-        if (!(modelType==:ANN))
-           printConfusionMatrix(hcat(collect(testOuts.=="banana")),hcat(collect(testTargets.=="banana")));
-        end;
-
         println("Results in test in fold ", numFold, "/", numFolds, ": accuracy: ", 100*testAccuracies[numFold], " %, F1: ", 100*testF1[numFold], " %");
 
     end; # for numFold in 1:numFolds
@@ -758,25 +712,22 @@ function modelCrossValidation(modelType::Symbol, modelHyperparameters::Dict, inp
     println(modelType, ": Average test accuracy on a ", numFolds, "-fold crossvalidation: ", 100*mean(testAccuracies), ", with a standard deviation of ", 100*std(testAccuracies));
     println(modelType, ": Average test F1 on a ", numFolds, "-fold crossvalidation: ", 100*mean(testF1), ", with a standard deviation of ", 100*std(testF1));
 
-    #println()
-
-    #println("Results in the training set:")
-    #trainingOutputs = ann(trainingInputs')';
-    #printConfusionMatrix(trainingOutputs, trainingTargets; weighted=true);
-    #println("Results in the validation set:")
-    #validationOutputs = ann(validationInputs')';
-    #printConfusionMatrix(validationOutputs, validationTargets; weighted=true);
-    #println("Results in the test set:")
-    #testOutputs = ann(testInputs')';
-    #printConfusionMatrix(testOutputs, testTargets; weighted=true);
-    #println("Results in the whole dataset:")
-    #outputs = ann(inputs')';
-    #printConfusionMatrix(outputs, targets; weighted=true);
-
     return (mean(testAccuracies), std(testAccuracies), mean(testF1), std(testF1));
 
 end;
 
+function plot_losses(losses_train, losses_val, losses_test)
+    plot(
+        x_lims=(0, length(losses_train)),
+        y_lims=(minimum([losses_train; losses_val; losses_test]), maximum([losses_train; losses_val; losses_test])),
+        legend=:topleft,
+        title="Evolución de los valores de loss",
+        size=(800, 500)
+    )
+    plot!(losses_train, label = "Entrenamiento")
+    plot!(losses_val, label = "Validación")
+    plot!(losses_test, label = "Prueba")
+end
 
 # Fijamos la semilla aleatoria para poder repetir los experimentos
 seed!(1);
@@ -784,7 +735,6 @@ seed!(1);
 numFolds = 10;
 
 # Parametros principales de la RNA y del proceso de entrenamiento
-topology = [4, 3]; # Dos capas ocultas con 4 neuronas la primera y 3 la segunda
 learningRate = 0.01; # Tasa de aprendizaje
 numMaxEpochs = 1000; # Numero maximo de ciclos de entrenamiento
 validationRatio = 0.2; # Porcentaje de patrones que se usaran para validacion. Puede ser 0, para no usar validacion
@@ -799,24 +749,33 @@ C=1;
 
 # Parametros del arbol de decision
 maxDepth = 4;
-
+image.png
 # Parapetros de kNN
 numNeighbors = 3;
 
+n_atribs = 9
 # Cargamos el dataset
 dataset = readdlm("data/datasets/fruits.data",',');
 # Preparamos las entradas y las salidas deseadas
-inputs = convert(Array{Float32,2}, dataset[:,1:3]);
-targets = dataset[:,4];
+inputs = convert(Array{Float32,2}, dataset[:,1:n_atribs]);
+targets = dataset[:,end];
 
-println("Matriz de entradas: ", size(inputs,1), "x", size(inputs,2), " de tipo ", typeof(inputs))
-println("Vector de salidas deseadas antes de codificar: ", length(targets), " de tipo ", typeof(targets))
+println("Comenzando entrenamiento")
 
 # Creamos los indices de validacion cruzada
 crossValidationIndices = crossvalidation(targets, numFolds);
-
 # Normalizamos las entradas, a pesar de que algunas se vayan a utilizar para test
 #normalizeMinMax!(inputs);
+
+topology = [16]#, 4, 16, [4, 2], [16, 4]]; # Dos capas ocultas con 4 neuronas la primera y 3 la segunda
+topology_string = join(topology)
+
+dirname = "./folds/aprox_2"
+output_name = dirname*"/$topology_string-output.txt"
+
+if !isdir(dirname)
+    mkdir(dirname);
+end
 
 # Entrenamos las RR.NN.AA.
 modelHyperparameters = Dict();
@@ -826,53 +785,25 @@ modelHyperparameters["validationRatio"] = validationRatio;
 modelHyperparameters["numExecutions"] = numRepetitionsANNTraining;
 modelHyperparameters["maxEpochs"] = numMaxEpochs;
 modelHyperparameters["maxEpochsVal"] = maxEpochsVal;
-println("\nRNA ----------------\n")
-(ANNtestAccuracies, _, ANNtestF1, _) = modelCrossValidation(:ANN, modelHyperparameters, inputs, targets, crossValidationIndices);
-
+open(output_name,"w+") do out
+    redirect_stdout(out) do
+        println("RNA ----------------\n")
+        @time "Elapsed time" modelCrossValidation(:ANN, modelHyperparameters, inputs, targets, crossValidationIndices);
+    end
+end
 # Entrenamos las SVM
-modelHyperparameters = Dict();
-modelHyperparameters["kernel"] = kernel;
-modelHyperparameters["kernelDegree"] = kernelDegree;
-modelHyperparameters["kernelGamma"] = kernelGamma;
-modelHyperparameters["C"] = C;
-println("\nSVM ----------------\n")
-(SVMtestAccuracies, _, SVMtestF1, _) = modelCrossValidation(:SVM, modelHyperparameters, inputs, targets, crossValidationIndices);
+# modelHyperparameters = Dict();
+# modelHyperparameters["kernel"] = kernel;
+# modelHyperparameters["kernelDegree"] = kernelDegree;
+# modelHyperparameters["kernelGamma"] = kernelGamma;
+# modelHyperparameters["C"] = C;
+# println("\nSVM ----------------\n")
+# modelCrossValidation(:SVM, modelHyperparameters, inputs, targets, crossValidationIndices);
 
-# Entrenamos los arboles de decision
-println("\nDT ----------------\n")
-(DTtestAccuracies, _, DTtestF1, _) = modelCrossValidation(:DecisionTree, Dict("maxDepth" => maxDepth), inputs, targets, crossValidationIndices);
+# # Entrenamos los arboles de decision
+# println("\nDT ----------------\n")
+# modelCrossValidation(:DecisionTree, Dict("maxDepth" => maxDepth), inputs, targets, crossValidationIndices);
 
-# Entrenamos los kNN
-println("\nkNN ----------------\n")
-(KNNtestAccuracies, _, KNNtestF1, _) = modelCrossValidation(:kNN, Dict("numNeighbors" => numNeighbors), inputs, targets, crossValidationIndices);
-
-println(" BEST ARCHITECTURE: ");
-    maxAcc = max(KNNtestAccuracies, DTtestAccuracies, SVMtestAccuracies, ANNtestAccuracies);
-    if (maxAcc == KNNtestAccuracies)
-        println("kNN");
-        return
-    end
-    if (maxAcc == DTtestAccuracies)
-        println("Decision Trees");
-        return
-    end
-    if (maxAcc == SVMtestAccuracies)
-        println("SVM");
-        println("kernel: " + kernel);
-        println("kernelDegree: " + kernelDegree);
-        println("kernelGamma:  " + kernelGamma);
-        println("C: " + C);
-
-        return
-    end
-    if (maxAcc == ANNtestAccuracies)
-        println("ANN");
-        println("configuración de las capas: " + topology);
-        println("tasa de aprendizaje" + learningRate);
-        println("numero maximo de ciclos de entrenamiento" + numMaxEpochs);
-        println("porcentaje de patrones que se usaran para validacion: "+ validationRatio);
-        println("numero de ciclos sin mejora b:" + maxEpochsVal);
-        println("numero de veces que se va a entrenar la RNA para cada fold por el hecho de ser no determinístico el entrenamiento: " + numRepetitionsANNTraining);
-        return
-    end
-
+# # Entrenamos los kNN
+# println("\nkNN ----------------\n")
+# modelCrossValidation(:kNN, Dict("numNeighbors" => numNeighbors), inputs, targets, crossValidationIndices);

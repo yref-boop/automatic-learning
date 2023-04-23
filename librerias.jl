@@ -11,3 +11,4 @@ using Clustering # Análisis de clustering, incluyendo el algoritmo K-means.
 using Colors # Funciones y tipos para trabajar con colores.
 using ScikitLearn
 using FileIO
+using ImageFiltering
