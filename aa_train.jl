@@ -447,6 +447,30 @@ end;
 
 
 # Funciones auxiliares para visualizar por pantalla la matriz de confusion y las metricas que se derivan de ella
+function printConfusionMatrix(confMatrix::Matrix{Int64})
+    numClasses = size(confMatrix,1);
+    writeHorizontalLine() = (for i in 1:numClasses+1 print("--------") end; println(""); );
+    writeHorizontalLine();
+    print("\t| ");
+    if (numClasses==2)
+        println(" - \t + \t|");
+    else
+        print.("Cl. ", 1:numClasses, "\t| ");
+    end;
+    println("");
+    writeHorizontalLine();
+    for numClassTarget in 1:numClasses
+        # print.(confMatrix[numClassTarget,:], "\t");
+        if (numClasses==2)
+            print(numClassTarget == 1 ? " - \t| " : " + \t| ");
+        else
+            print("Cl. ", numClassTarget, "\t| ");
+        end;
+        print.(confMatrix[numClassTarget,:], "\t| ");
+        println("");
+        writeHorizontalLine();
+    end;
+end;
 function printConfusionMatrix(outputs::AbstractArray{Bool,2}, targets::AbstractArray{Bool,2}; weighted::Bool=true)
     (acc, errorRate, recall, specificity, precision, NPV, F1, confMatrix) = confusionMatrix(outputs, targets; weighted=weighted);
     numClasses = size(confMatrix,1);
@@ -481,6 +505,7 @@ function printConfusionMatrix(outputs::AbstractArray{Bool,2}, targets::AbstractA
     return (acc, errorRate, recall, specificity, precision, NPV, F1, confMatrix);
 end;
 printConfusionMatrix(outputs::AbstractArray{<:Real,2}, targets::AbstractArray{Bool,2}; weighted::Bool=true) =  printConfusionMatrix(classifyOutputs(outputs), targets; weighted=weighted)
+printConfusionMatrix(outputs::Matrix{Int64}, targets::Matrix{Int64}; weighted::Bool=true) =  printConfusionMatrix(classifyOutputs(outputs), targets; weighted=weighted)
 printConfusionMatrix(outputs::AbstractArray{Bool,1},   targets::AbstractArray{Bool,1})                      = printConfusionMatrix(reshape(outputs, :, 1), targets);
 printConfusionMatrix(outputs::AbstractArray{<:Real,1}, targets::AbstractArray{Bool,1}; threshold::Real=0.5) = printConfusionMatrix(outputs.>=threshold,    targets);
 
@@ -645,14 +670,20 @@ function modelCrossValidation(modelType::Symbol, modelHyperparameters::Dict, inp
             testOutputs = predict(model, testInputs);
 
             # Calculamos las metricas correspondientes con la funcion desarrollada en la practica anterior
-            (acc, _, _, _, _, _, F1, _) = confusionMatrix(testOutputs, testTargets);
+            (acc, _, _, _, _, _, F1, cmatrix) = confusionMatrix(testOutputs, testTargets);
+            function identify(class)
+                if class=="bananas"
+                    1
+                elseif class=="manzanas"
+                    2
+                elseif class=="naranjas"
+                    3
+                end
+            end
 
-        else
+            printConfusionMatrix(cmatrix);
 
-            # Vamos a usar RR.NN.AA.
-            @assert(modelType==:ANN);
-
-            # Dividimos los datos en entrenamiento y test
+        else # Vamos a usar RR.NN.AA. @assert(modelType==:ANN); Dividimos los datos en entrenamiento y test
             trainingInputs    = inputs[crossValidationIndices.!=numFold,:];
             testInputs        = inputs[crossValidationIndices.==numFold,:];
             trainingTargets   = targets[crossValidationIndices.!=numFold,:];
@@ -691,7 +722,10 @@ function modelCrossValidation(modelType::Symbol, modelHyperparameters::Dict, inp
                 end;
 
                 # Calculamos las metricas correspondientes con la funcion desarrollada en la practica anterior
-                (testAccuraciesEachRepetition[numTraining], _, _, _, _, _, testF1EachRepetition[numTraining], _) = confusionMatrix(collect(ann(testInputs')'), testTargets);
+                (testAccuraciesEachRepetition[numTraining], _, _, _, _, _, testF1EachRepetition[numTraining], cmatrix) = confusionMatrix(collect(ann(testInputs')'), testTargets);
+
+                printConfusionMatrix(cmatrix);
+
 
             end;
 
@@ -744,12 +778,12 @@ numRepetitionsANNTraining = 50; # Numero de veces que se va a entrenar la RNA pa
 # Parametros del SVM
 kernel = "rbf";
 kernelDegree = 3;
-kernelGamma = 2;
-C=1;
+kernelGamma = 4;
+C=10;
 
 # Parametros del arbol de decision
-maxDepth = 4;
-image.png
+maxDepth = 6;
+
 # Parapetros de kNN
 numNeighbors = 3;
 
@@ -770,27 +804,28 @@ crossValidationIndices = crossvalidation(targets, numFolds);
 topology = [16]#, 4, 16, [4, 2], [16, 4]]; # Dos capas ocultas con 4 neuronas la primera y 3 la segunda
 topology_string = join(topology)
 
-dirname = "./folds/aprox_2"
-output_name = dirname*"/$topology_string-output.txt"
+#dirname = "./folds/aprox_2"
+#output_name = dirname*"/$topology_string-output.txt"
 
-if !isdir(dirname)
-    mkdir(dirname);
-end
+# if !isdir(dirname)
+#    mkdir(dirname);
+#end
 
 # Entrenamos las RR.NN.AA.
-modelHyperparameters = Dict();
-modelHyperparameters["topology"] = topology;
-modelHyperparameters["learningRate"] = learningRate;
-modelHyperparameters["validationRatio"] = validationRatio;
-modelHyperparameters["numExecutions"] = numRepetitionsANNTraining;
-modelHyperparameters["maxEpochs"] = numMaxEpochs;
-modelHyperparameters["maxEpochsVal"] = maxEpochsVal;
-open(output_name,"w+") do out
-    redirect_stdout(out) do
-        println("RNA ----------------\n")
-        @time "Elapsed time" modelCrossValidation(:ANN, modelHyperparameters, inputs, targets, crossValidationIndices);
-    end
-end
+ modelHyperparameters = Dict();
+ modelHyperparameters["topology"] = topology;
+ modelHyperparameters["learningRate"] = learningRate;
+ modelHyperparameters["validationRatio"] = validationRatio;
+ modelHyperparameters["numExecutions"] = numRepetitionsANNTraining;
+ modelHyperparameters["maxEpochs"] = numMaxEpochs;
+ modelHyperparameters["maxEpochsVal"] = maxEpochsVal;
+modelCrossValidation(:ANN, modelHyperparameters, inputs, targets, crossValidationIndices);
+# open(output_name,"w+") do out
+#     redirect_stdout(out) do
+#         println("RNA ----------------\n")
+#         @time "Elapsed time" modelCrossValidation(:ANN, modelHyperparameters, inputs, targets, crossValidationIndices);
+#     end
+# end
 # Entrenamos las SVM
 # modelHyperparameters = Dict();
 # modelHyperparameters["kernel"] = kernel;
@@ -800,9 +835,9 @@ end
 # println("\nSVM ----------------\n")
 # modelCrossValidation(:SVM, modelHyperparameters, inputs, targets, crossValidationIndices);
 
-# # Entrenamos los arboles de decision
-# println("\nDT ----------------\n")
-# modelCrossValidation(:DecisionTree, Dict("maxDepth" => maxDepth), inputs, targets, crossValidationIndices);
+# Entrenamos los arboles de decision
+#println("\nDT ----------------\n")
+#modelCrossValidation(:DecisionTree, Dict("maxDepth" => maxDepth), inputs, targets, crossValidationIndices);
 
 # # Entrenamos los kNN
 # println("\nkNN ----------------\n")
