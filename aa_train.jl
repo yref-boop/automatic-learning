@@ -643,6 +643,9 @@ function modelCrossValidation(modelType::Symbol, modelHyperparameters::Dict, inp
     testAccuracies = Array{Float64,1}(undef, numFolds);
     testF1         = Array{Float64,1}(undef, numFolds);
 
+    # guardar matriz confusion para un fold
+    local ann_matrix;
+
     # Para cada fold, entrenamos
     for numFold in 1:numFolds
 
@@ -671,15 +674,6 @@ function modelCrossValidation(modelType::Symbol, modelHyperparameters::Dict, inp
 
             # Calculamos las metricas correspondientes con la funcion desarrollada en la practica anterior
             (acc, _, _, _, _, _, F1, cmatrix) = confusionMatrix(testOutputs, testTargets);
-            function identify(class)
-                if class=="bananas"
-                    1
-                elseif class=="manzanas"
-                    2
-                elseif class=="naranjas"
-                    3
-                end
-            end
 
             printConfusionMatrix(cmatrix);
 
@@ -724,14 +718,14 @@ function modelCrossValidation(modelType::Symbol, modelHyperparameters::Dict, inp
                 # Calculamos las metricas correspondientes con la funcion desarrollada en la practica anterior
                 (testAccuraciesEachRepetition[numTraining], _, _, _, _, _, testF1EachRepetition[numTraining], cmatrix) = confusionMatrix(collect(ann(testInputs')'), testTargets);
 
-                printConfusionMatrix(cmatrix);
-
+                ann_matrix = cmatrix;
 
             end;
 
             # Calculamos el valor promedio de todos los entrenamientos de este fold
             acc = mean(testAccuraciesEachRepetition);
             F1  = mean(testF1EachRepetition);
+            printConfusionMatrix(ann_matrix);
 
         end;
 
@@ -798,8 +792,9 @@ println("Comenzando entrenamiento")
 
 # Creamos los indices de validacion cruzada
 crossValidationIndices = crossvalidation(targets, numFolds);
+
 # Normalizamos las entradas, a pesar de que algunas se vayan a utilizar para test
-#normalizeMinMax!(inputs);
+normalizeMinMax!(inputs);
 
 topology = [16]#, 4, 16, [4, 2], [16, 4]]; # Dos capas ocultas con 4 neuronas la primera y 3 la segunda
 topology_string = join(topology)
@@ -819,7 +814,7 @@ topology_string = join(topology)
  modelHyperparameters["numExecutions"] = numRepetitionsANNTraining;
  modelHyperparameters["maxEpochs"] = numMaxEpochs;
  modelHyperparameters["maxEpochsVal"] = maxEpochsVal;
-modelCrossValidation(:ANN, modelHyperparameters, inputs, targets, crossValidationIndices);
+ modelCrossValidation(:ANN, modelHyperparameters, inputs, targets, crossValidationIndices);
 # open(output_name,"w+") do out
 #     redirect_stdout(out) do
 #         println("RNA ----------------\n")
