@@ -1,0 +1,15 @@
+RNA [1] ----------------
+
+Results in test in fold 1/10: accuracy: 66.91176470588235 %, F1: 58.28250194137687 %
+Results in test in fold 2/10: accuracy: 62.17647058823529 %, F1: 54.18981547479167 %
+Results in test in fold 3/10: accuracy: 62.35820895522388 %, F1: 54.498396044449194 %
+Results in test in fold 4/10: accuracy: 69.64179104477611 %, F1: 60.71240770379319 %
+Results in test in fold 5/10: accuracy: 67.64179104477611 %, F1: 59.12619650413049 %
+Results in test in fold 6/10: accuracy: 67.73134328358209 %, F1: 58.86529630003528 %
+Results in test in fold 7/10: accuracy: 67.75757575757575 %, F1: 59.39597010247732 %
+Results in test in fold 8/10: accuracy: 64.60606060606061 %, F1: 56.993311693546964 %
+Results in test in fold 9/10: accuracy: 62.03030303030304 %, F1: 54.68809996727011 %
+Results in test in fold 10/10: accuracy: 67.66666666666667 %, F1: 58.819497528828805 %
+ANN: Average test accuracy on a 10-fold crossvalidation: 65.85219756830818, with a standard deviation of 2.8090915745507963
+ANN: Average test F1 on a 10-fold crossvalidation: 57.55714932606999, with a standard deviation of 2.3303314078765918
+Elapsed time: 36.335241 seconds (86.52 M allocations: 31.800 GiB, 6.77% gc time, 2.54% compilation time)
